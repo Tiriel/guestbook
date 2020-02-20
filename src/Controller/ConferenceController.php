@@ -13,12 +13,19 @@ use Twig\Environment;
 
 class ConferenceController extends AbstractController
 {
+    private $twig;
+
+    public function __construct(Environment $twig)
+    {
+        $this->twig = $twig;
+    }
+
     /**
      * @Route("/", name="homepage")
      */
-    public function index(Environment $twig, ConferenceRepository $repository)
+    public function index(ConferenceRepository $repository)
     {
-        return new Response($twig->render('conference/index.html.twig', [
+        return new Response($this->twig->render('conference/index.html.twig', [
             'conferences' => $repository->findAll(),
         ]));
     }
@@ -26,11 +33,16 @@ class ConferenceController extends AbstractController
     /**
      * @Route("/conference/{id}", methods="GET", name="conference")
      */
-    public function show(Environment $twig, Conference $conference, CommentRepository $commentRepository): Response
+    public function show(Request $request, Conference $conference, CommentRepository $commentRepository): Response
     {
-        return new Response($twig->render('conference/show.html.twig', [
+        $offset = max(0, $request->query->getInt('offset', 0));
+        $paginator = $commentRepository->getCommentPaginator($conference, $offset);
+
+        return new Response($this->twig->render('conference/show.html.twig', [
             'conference' => $conference,
-            'comments' => $commentRepository->findBy(['conference' => $conference], ['createdAt' => 'DESC']),
+            'comments' => $paginator,
+            'previous' => $offset - CommentRepository::PAGINATOR_PER_PAGE,
+            'next' => min(\count($paginator), $offset + CommentRepository::PAGINATOR_PER_PAGE),
         ]));
     }
 }
